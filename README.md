@@ -4,4 +4,4 @@ Install Instructions for Jailbreaking tools
 Payloads (.js, .bin, and .elf)
 
 Installation Instructions:
-Y2JB
+[Extra/Installation/Y2JB.md](Extra/Installation/Y2JB.md)
