@@ -1,3 +1,7 @@
+# log_server.py
+# Copyright (c) 2025 Gezine
+# Licensed under the MIT License. See Extra/Licenses/LICENSE-Y2JB
+
 #!/usr/bin/env python3
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
