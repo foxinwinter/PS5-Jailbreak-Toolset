@@ -1,3 +1,8 @@
+/* dlsym_test.js
+Copyright (c) 2025 Gezine
+Licensed under the MIT License. See Extra/Licenses/LICENSE-Y2JB
+*/
+
 (async function() {
     check_jailbroken();
     

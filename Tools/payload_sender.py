@@ -1,3 +1,7 @@
+# payload_sender.py
+# Copyright (c) 2025 Gezine
+# Licensed under the MIT License. See Extra/Licenses/LICENSE-Y2JB
+
 import socket
 def send_payload(jar_path, host, port=50000):
     with open(jar_path, 'rb') as f:
