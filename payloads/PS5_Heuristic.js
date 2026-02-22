@@ -1,3 +1,8 @@
+/* PS5_Heuristic.js
+Copyright (c) 2026 foxinwinter
+Licensed under GPLv3. See Extra/Licenses/LICENSE
+*/
+
 (async () => {
 
     /* ================= Screen Clear ================= */
