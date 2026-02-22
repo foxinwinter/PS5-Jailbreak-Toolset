@@ -4,5 +4,6 @@ Install Instructions for Jailbreaking tools
 Payloads (.js, .bin, and .elf)
 
 Installation Instructions:                          
-Userland Exploits:
-[Y2JB](Extra/Installation/Y2JB.md)
+
+Userland Exploits:<br>
+[Y2JB Install Guide](Extra/Installation/Y2JB.md)
