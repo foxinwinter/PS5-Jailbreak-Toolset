@@ -126,9 +126,6 @@ Licensed under GPLv3. See Extra/Licenses/LICENSE
     } catch (_) {}
     push(`Kernel Exploit: ${kernelExploit ? "Yes" : "No"}`);
 
-    push(`WebKit Exploit Potential: ${userlandExec ? "Yes" : "No"}`);
-    push("");
-
     /* ================= User-Agent / App Info ================= */
     push("System Info");
     push("---------------------");
@@ -136,13 +133,13 @@ Licensed under GPLv3. See Extra/Licenses/LICENSE
     const ua = navigator.userAgent || "unknown";
     push(`Cobalt Version: ${ua.match(/Cobalt\/([\d.lts]+)/)?.[1] || "unknown"}`);
     push(`GLES: ${ua.includes("gles") ? "Yes" : "No"}`);
-    push(`JIT Flag in UA: ${ua.includes("jitless") ? "jitless detected" : "not present"}`);
+    push(`JIT Flag: ${ua.includes("jitless") ? "jitless detected" : "not present"}`);
 
     const wk = ua.match(/AppleWebKit\/([\d.]+)/)?.[1] || "unknown";
     push(`WebKit Version: ${wk}`);
     const appMatch = ua.match(/YouTube_[^ ]+/);
     if (appMatch) push(`App Info: ${appMatch[0]}`);
-    push(`FW_VERSION (Y2JB): ${typeof FW_VERSION !== "undefined" ? FW_VERSION : "not set"}`);
+    push(`FW_VERSION: ${typeof FW_VERSION !== "undefined" ? FW_VERSION : "not set"}`);
     push("");
 
     push("==================== Heuristic Complete ====================");

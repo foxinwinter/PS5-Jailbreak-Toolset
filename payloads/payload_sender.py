@@ -1,1 +1,1 @@
-/home/fox/Projects/PS5/PS5-Jailbreak-Toolset/Tools/payload_sender.py
+../Tools/payload_sender.py
