@@ -9,8 +9,11 @@ import platform
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(SCRIPT_DIR)
-CONFIG_FILE = os.path.join(SCRIPT_DIR, "ps5_config.txt")
-LOG_FILE = os.path.join(SCRIPT_DIR, "log_server.log")
+CONFIG_DIR = os.path.join(SCRIPT_DIR, ".config")
+CONFIG_FILE = os.path.join(CONFIG_DIR, "ps5_config.txt")
+LOG_FILE = os.path.join(CONFIG_DIR, "log_server.log")
+
+os.makedirs(CONFIG_DIR, exist_ok=True)
 
 PAYLOAD_SENDER = os.path.join(SCRIPT_DIR, "Y2JB", "payload_sender.py")
 LOG_SERVER = os.path.join(SCRIPT_DIR, "Y2JB", "log_server.py")
