@@ -1,3 +1,6 @@
 [submodule "Exploits/Userland/Y2JB"]
 	path = Exploits/Userland/Y2JB
 	url = https://github.com/Gezine/Y2JB
+[submodule "Exploits/Userland/Netlix-N-Hack"]
+	path = Exploits/Userland/Netlix-N-Hack
+	url = https://github.com/NetflixNHack/Netflix-N-Hack
