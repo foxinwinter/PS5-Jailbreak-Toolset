@@ -1,3 +1,7 @@
+## main.py
+## Copyright (c) 2026 foxinwinter
+## Licensed under GPLv3. See Extra/Licenses/LICENSE
+
 #!/usr/bin/env python3
 import os
 import sys
