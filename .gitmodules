@@ -1,0 +1,3 @@
+[submodule "Exploits/Userland/Y2JB"]
+	path = Exploits/Userland/Y2JB
+	url = https://github.com/Gezine/Y2JB
