@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+# main
+# Copyright (c) 2026 foxinwinter
+# Licensed under GPLv3. See Extra/Licenses/LICENSE
+
+import argparse
+import sys
+import os
+import importlib
+import inspect
+import platform
+
+VERSION = "Alpha"
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT_DIR)
+
+from Core.Exploits.Y2JB import Y2JB as Y2JBClass
+
+EXPLOITS = {}
+EXPLOIT_INFO = {}
+
+
+def scan_exploits():
+    exploits_dir = os.path.join(ROOT_DIR, "Core", "Exploits")
+    info_dir = os.path.join(exploits_dir, "info")
+
+    for root, _, files in os.walk(exploits_dir):
+        for filename in files:
+            if filename.endswith(".py") and not filename.startswith("_"):
+                module_name = filename[:-3]
+                rel_path = os.path.relpath(os.path.join(root, filename), exploits_dir)
+                rel_module = os.path.splitext(rel_path)[0].replace(os.sep, ".")
+                try:
+                    module = importlib.import_module(f"Core.Exploits.{rel_module}")
+                    for name, obj in inspect.getmembers(module):
+                        if inspect.isclass(obj) and name != "Y2JB" and hasattr(obj, "run"):
+                            EXPLOITS[name.upper()] = obj
+                            EXPLOIT_INFO[name.upper()] = load_exploit_info(
+                                info_dir, module_name
+                            )
+                except Exception as e:
+                    print(f"Warning: Failed to load exploit module {module_name}: {e}")
+
+    if not EXPLOITS:
+        try:
+            EXPLOITS["Y2JB"] = Y2JBClass
+            EXPLOIT_INFO["Y2JB"] = load_exploit_info(info_dir, "Y2JB")
+        except (AttributeError, NameError):
+            pass
+
+
+def load_exploit_info(info_dir, exploit_name):
+    info_file = os.path.join(info_dir, f"{exploit_name}.txt")
+    info = {"About": "N/A", "Author": "N/A", "License": "N/A"}
+
+    if os.path.exists(info_file):
+        try:
+            with open(info_file, "r") as f:
+                content = f.read()
+                for line in content.strip().split("\n"):
+                    line = line.strip()
+                    if line.startswith("About:"):
+                        info["About"] = line.split(":", 1)[1].strip()
+                    elif line.startswith("Author:"):
+                        info["Author"] = line.split(":", 1)[1].strip()
+                    elif line.startswith("License:"):
+                        license_path = line.split(":", 1)[1].strip()
+                        license_path = license_path.replace("RepoRoot", ROOT_DIR)
+                        info["License"] = license_path
+        except Exception:
+            pass
+
+    return info
+
+
+def cmd_list(args):
+    print("\nAvailable Exploits:")
+    print(f"{'Name':<20} {'Author':<20} {'About'}")
+    print("-" * 70)
+    for name, info in EXPLOIT_INFO.items():
+        about = info.get("About", "N/A")
+        if len(about) > 25:
+            about = about[:22] + "..."
+        author = info.get("Author", "N/A")
+        if len(author) > 18:
+            author = author[:15] + "..."
+        print(f"{name:<20} {author:<20} {about}")
+    print()
+
+
+def cmd_info(args):
+    name = args.exploit.upper()
+    if name not in EXPLOIT_INFO:
+        print(f"Error: Unknown exploit '{args.exploit}'")
+        print(f"Available exploits: {', '.join(EXPLOITS.keys())}")
+        sys.exit(1)
+
+    info = EXPLOIT_INFO[name]
+    print(f"\n=== {name} ===")
+    print(f"About:    {info.get('About', 'N/A')}")
+    print(f"Author:   {info.get('Author', 'N/A')}")
+    print(f"License:  {info.get('License', 'N/A')}")
+    print()
+
+
+def cmd_run(args):
+    name = args.exploit.upper()
+    if name not in EXPLOITS:
+        print(f"Error: Unknown exploit '{args.exploit}'")
+        print(f"Available exploits: {', '.join(EXPLOITS.keys())}")
+        sys.exit(1)
+
+    exploit = EXPLOITS[name]()
+    try:
+        exploit.run(config_override=args.config)
+    except KeyboardInterrupt:
+        print("\nInterrupted by user.")
+        sys.exit(130)
+
+
+def cmd_doctor(args):
+    print("\n=== PS5 Jailbreak Toolset Doctor ===\n")
+
+    errors = []
+    warnings = []
+
+    print(f"Python version: {platform.python_version()}")
+    if sys.version_info < (3, 8):
+        errors.append("Python 3.8+ required")
+    else:
+        print("[OK] Python version")
+
+    required_dirs = [
+        ("Core/Exploits", os.path.join(ROOT_DIR, "Core", "Exploits")),
+        ("Core/Exploits/info", os.path.join(ROOT_DIR, "Core", "Exploits", "info")),
+        ("payloads", os.path.join(ROOT_DIR, "payloads")),
+        ("Tools", os.path.join(ROOT_DIR, "Tools")),
+    ]
+
+    for name, path in required_dirs:
+        if os.path.isdir(path):
+            print(f"[OK] {name}")
+        else:
+            errors.append(f"Missing directory: {name}")
+
+    payload_paths = [
+        os.path.join(ROOT_DIR, "payloads", "Y2JB", "setlogserver.js"),
+        os.path.join(ROOT_DIR, "payloads", "Main", "PS5_Heuristic.js"),
+        os.path.join(ROOT_DIR, "payloads", "Y2JB", "lapse.js"),
+    ]
+
+    for path in payload_paths:
+        rel_path = os.path.relpath(path, ROOT_DIR)
+        if os.path.exists(path):
+            print(f"[OK] {rel_path}")
+        else:
+            warnings.append(f"Missing payload: {rel_path}")
+
+    info_dir = os.path.join(ROOT_DIR, "Core", "Exploits", "info")
+    if os.path.isdir(info_dir):
+        info_files = [f for f in os.listdir(info_dir) if f.endswith(".txt")]
+        print(f"[OK] Info directory ({len(info_files)} info files)")
+    else:
+        errors.append("Missing info directory")
+
+    print()
+    if errors:
+        print("ERRORS:")
+        for e in errors:
+            print(f"  [ERROR] {e}")
+    if warnings:
+        print("WARNINGS:")
+        for w in warnings:
+            print(f"  [WARN] {w}")
+    if not errors and not warnings:
+        print("All checks passed!")
+    print()
+
+
+def main():
+    scan_exploits()
+
+    parser = argparse.ArgumentParser(description="PS5 Jailbreak Toolset")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
+
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    list_parser = subparsers.add_parser("list", help="List available exploits")
+
+    info_parser = subparsers.add_parser("info", help="Show exploit info")
+    info_parser.add_argument("exploit", help="Exploit name")
+
+    run_parser = subparsers.add_parser("run", help="Run an exploit")
+    run_parser.add_argument("exploit", help="Exploit name")
+    run_parser.add_argument(
+        "--config", action="store_true", help="Force prompt for PS5 configuration"
+    )
+
+    doctor_parser = subparsers.add_parser("doctor", help="Run environment diagnostics")
+
+    args = parser.parse_args()
+
+    if args.command == "list":
+        cmd_list(args)
+    elif args.command == "info":
+        cmd_info(args)
+    elif args.command == "run":
+        cmd_run(args)
+    elif args.command == "doctor":
+        cmd_doctor(args)
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
