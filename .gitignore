@@ -1,5 +1,5 @@
-Tools/.config/log_server.log 
-Tools/.config/ps5_config.txt
+.ruff_cache/
+__pycache__/
+Core/Exploits/__pycache__/
+Core/Exploits/.config/
 Tools/.config/
-.ruff_cache/ 
-Core/Explits/__pycache__
