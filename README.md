@@ -1,4 +1,8 @@
-PS5 Jailbreaking Toolbox
+## NOTE
+This REPO is archived and no longer maintained, develpment may continue later in the future.
+
+
+## PS5 Jailbreaking Toolbox
 This repo includes:
 Install Instructions for Jailbreaking tools
 Payloads (.js, .bin, and .elf)
