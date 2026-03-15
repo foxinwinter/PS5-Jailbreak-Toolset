@@ -6,5 +6,6 @@ __pycache__/
 .config/
 misc.txt
 logs/
-Core/Verification/HashVerification/private/
+Core/Verification/HashVerification/private/private_key.pem
+
 

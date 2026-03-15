@@ -50,21 +50,24 @@ def verify_tool_hashes():
         "TOOL_Y2JB_LOG_SERVER": LOG_SERVER,
     }
     
+    print("Tool Integrity Check")
+    print("-" * 60)
+    
     all_valid = True
     for tool_name, tool_path in tools.items():
         expected_hash = trusted.get(tool_name)
         if not expected_hash:
-            print(f"[WARNING] No hash configured for {tool_name}")
+            print(f"[WARN] {tool_name:<30} no hash configured")
             continue
         if not os.path.exists(tool_path):
-            print(f"[ERROR] Tool not found: {tool_path}")
+            print(f"[ERR ] {tool_name:<30} tool not found")
             all_valid = False
             continue
         actual_hash = compute_sha256(tool_path)
         if actual_hash == expected_hash:
-            print(f"[OK] {tool_name}: verified ({actual_hash[:16]}...)")
+            print(f"[ OK ] {tool_name:<30} {actual_hash[:16]}...")
         else:
-            print(f"[ERROR] {tool_name}: SHA256 mismatch! Expected {expected_hash[:16]}..., got {actual_hash[:16]}...")
+            print(f"[ERR ] {tool_name:<30} mismatch!")
             all_valid = False
     
     return all_valid
@@ -98,7 +101,6 @@ def verify_payload_signature():
         with open(signature_file, "rb") as f:
             signature = f.read()
         public_key.verify(signature, data, padding.PKCS1v15(), hashes.SHA256())
-        print("[OK] Payload hash signature verified")
         return True
     except Exception as e:
         print(f"[SECURITY] Payload signature verification FAILED: {e}")
@@ -121,7 +123,7 @@ def verify_payload_hashes():
                 name, hash_val = line.split(":", 1)
                 name = name.strip().upper()
                 hash_val = hash_val.strip()
-                if name.startswith("PAYLOAD_Y2JB_"):
+                if name.startswith("PAYLOAD_Y2JB_") or name.startswith("PAYLOAD_JS_"):
                     trusted[name] = hash_val
     
     payloads = {
@@ -131,23 +133,35 @@ def verify_payload_hashes():
         "PAYLOAD_Y2JB_PS5_HEURISTIC": PS5_HEURISTIC_JS,
     }
     
+    def get_hash(name):
+        name_part = "_".join(name.split("_")[2:])
+        for prefix in ["PAYLOAD_Y2JB_", "PAYLOAD_JS_"]:
+            h = trusted.get(prefix + name_part)
+            if h:
+                return h
+        return None
+    
+    print("Payload Integrity Check")
+    print("-" * 60)
+    
     all_valid = True
     for payload_name, payload_path in payloads.items():
-        expected_hash = trusted.get(payload_name)
+        expected_hash = get_hash(payload_name)
         if not expected_hash:
-            print(f"[WARNING] No hash configured for {payload_name}")
+            print(f"[WARN] {payload_name:<30} no hash configured")
             continue
         if not os.path.exists(payload_path):
-            print(f"[ERROR] Payload not found: {payload_path}")
+            print(f"[ERR ] {payload_name:<30} not found")
             all_valid = False
             continue
         actual_hash = compute_sha256(payload_path)
         if actual_hash == expected_hash:
-            print(f"[OK] {payload_name}: verified ({actual_hash[:16]}...)")
+            print(f"[ OK ] {payload_name:<30} {actual_hash[:16]}...")
         else:
-            print(f"[ERROR] {payload_name}: SHA256 mismatch! Expected {expected_hash[:16]}..., got {actual_hash[:16]}...")
+            print(f"[ERR ] {payload_name:<30} mismatch!")
             all_valid = False
     
+    print()
     return all_valid
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -165,7 +179,7 @@ PAYLOAD_SENDER = os.path.join(TOOLS_DIR, "payload_sender.py")
 LOG_SERVER = os.path.join(TOOLS_DIR, "log_server.py")
 EXPLOIT_DIR = os.path.join(BASE_DIR, "Core", "Exploits", "Y2JB")
 SETLOGSERVER_JS = os.path.join(EXPLOIT_DIR, "payloads", "setlogserver.js")
-PS5_HEURISTIC_JS = os.path.join(BASE_DIR, "payloads", "JS", "Main", "PS5_Heuristic.js")
+PS5_HEURISTIC_JS = os.path.join(BASE_DIR, "Core", "Payloads", "JS", "PS5_Heuristic.js")
 LAPSE_JS = os.path.join(EXPLOIT_DIR, "payloads", "lapse.js")
 DLSYM_TEST_JS = os.path.join(EXPLOIT_DIR, "payloads", "dlsym_test.js")
 SEND_PAYLOAD_PY = os.path.join(SCRIPT_DIR, "send_payload.py")
@@ -347,23 +361,19 @@ class Y2JB:
                 print(f.read())
         else:
             print("Intro file not found.")
-        print("-" * 40)
-        print()
 
     def run(self, config_override=False):
         self.intro()
 
-        print("\n--- Verifying Tool Integrity ---")
-        if not verify_tool_hashes():
-            print("[ERROR] Tool verification failed! Exiting.")
-            return False
-
-        print("\n--- Verifying Payload Integrity ---")
         if not verify_payload_signature():
             print("[ERROR] Payload signature verification failed! Exiting.")
             return False
         if not verify_payload_hashes():
             print("[ERROR] Payload verification failed! Exiting.")
+            return False
+
+        if not verify_tool_hashes():
+            print("[ERROR] Tool verification failed! Exiting.")
             return False
 
         local_ip = self.get_local_ip()
@@ -440,12 +450,6 @@ class Y2JB:
     def y2jb_repl(self, ps5_ip=None, ps5_port=None):
         self.intro()
 
-        print("\n--- Verifying Tool Integrity ---")
-        if not verify_tool_hashes():
-            print("[ERROR] Tool verification failed! Exiting.")
-            return
-
-        print("\n--- Verifying Payload Integrity ---")
         if not verify_payload_signature():
             print("[ERROR] Payload signature verification failed! Exiting.")
             return
@@ -453,10 +457,16 @@ class Y2JB:
             print("[ERROR] Payload verification failed! Exiting.")
             return
 
+        if not verify_tool_hashes():
+            print("[ERROR] Tool verification failed! Exiting.")
+            return
+
         if ps5_ip is None:
             ps5_ip, ps5_port = self.read_ps5_config()
 
-        print("\n=== Y2JB Console ===")
+        print("\n============================================================")
+        print("                     Y2JB Console")
+        print("============================================================")
         print("Type 'help' for available commands, 'exit' to quit.\n")
 
         if ps5_ip is None or ps5_ip == "127.0.0.1":

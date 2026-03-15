@@ -2,12 +2,14 @@
 import os
 import sys
 import argparse
+import hashlib
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 VERIFICATION_DIR = SCRIPT_DIR
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(VERIFICATION_DIR)))
 
 def generate_keys():
     private_dir = os.path.join(VERIFICATION_DIR, "private")
@@ -42,6 +44,122 @@ def generate_keys():
         ))
     print(f"Public key saved to: {public_key_path}")
     print("\nDone!")
+
+def compute_sha256(file_path):
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+def get_subrepls():
+    subrepls_dir = os.path.join(PROJECT_ROOT, "Core", "subREPLs")
+    subrepls = []
+    if os.path.exists(subrepls_dir):
+        for item in os.listdir(subrepls_dir):
+            item_path = os.path.join(subrepls_dir, item)
+            if os.path.isfile(item_path) and not item.startswith("."):
+                subrepls.append(item.upper())
+    return subrepls
+
+def get_tools(subrepl):
+    tools_dir = os.path.join(PROJECT_ROOT, "Tools", subrepl)
+    tools = []
+    if os.path.exists(tools_dir):
+        for item in os.listdir(tools_dir):
+            if item.endswith(".py"):
+                tools.append(item[:-3])
+    return tools
+
+def get_payloads():
+    payloads = []
+    
+    js_dir = os.path.join(PROJECT_ROOT, "Core", "Payloads", "JS")
+    if os.path.exists(js_dir):
+        for item in os.listdir(js_dir):
+            if item.endswith((".js", ".bin", ".elf")):
+                payloads.append(("JS", item))
+    
+    exploits_dir = os.path.join(PROJECT_ROOT, "Core", "Exploits")
+    if os.path.exists(exploits_dir):
+        for exploit in os.listdir(exploits_dir):
+            if exploit.startswith("."):
+                continue
+            exploit_path = os.path.join(exploits_dir, exploit)
+            if not os.path.isdir(exploit_path):
+                continue
+            exploit_payloads_dir = os.path.join(exploit_path, "payloads")
+            if os.path.isdir(exploit_payloads_dir):
+                for item in os.listdir(exploit_payloads_dir):
+                    if item.endswith((".js", ".bin", ".elf")):
+                        payloads.append((exploit.upper(), item))
+    
+    return payloads
+
+def auto():
+    private_dir = os.path.join(VERIFICATION_DIR, "private")
+    private_key_path = os.path.join(private_dir, "private_key.pem")
+    public_key_path = os.path.join(private_dir, "public_key.pem")
+    
+    if not os.path.exists(private_key_path):
+        print("No keys found. Generating new keypair...")
+        generate_keys()
+    
+    print("\n--- Computing hashes ---")
+    
+    subrepls = get_subrepls()
+    tools_dict = {}
+    for subrepl in subrepls:
+        tools_dict[subrepl] = get_tools(subrepl)
+    payloads = get_payloads()
+    
+    hashes_output = ["# Trusted SHA256 hashes for subREPLs, Tools, and Payloads", 
+                     "# Format: NAME:hash",
+                     "# Sections: subREPLs, Tools, Payloads", "",
+                     "# subREPLs"]
+    
+    for subrepl in subrepls:
+        subrepl_path = os.path.join(PROJECT_ROOT, "Core", "subREPLs", subrepl.lower())
+        if os.path.isfile(subrepl_path):
+            hash_val = compute_sha256(subrepl_path)
+            hashes_output.append(f"{subrepl}:{hash_val}")
+            print(f"  subREPL {subrepl}: {hash_val}")
+    
+    hashes_output.extend(["", "# Tools"])
+    
+    for subrepl in subrepls:
+        for tool in tools_dict.get(subrepl, []):
+            tool_path = os.path.join(PROJECT_ROOT, "Tools", subrepl, f"{tool}.py")
+            if os.path.exists(tool_path):
+                hash_val = compute_sha256(tool_path)
+                hashes_output.append(f"TOOL_{subrepl}_{tool.upper()}:{hash_val}")
+                print(f"  TOOL_{subrepl}_{tool}: {hash_val}")
+    
+    hashes_output.extend(["", "# Payloads"])
+    
+    for subrepl, payload in payloads:
+        if subrepl == "JS":
+            payload_path = os.path.join(PROJECT_ROOT, "Core", "Payloads", "JS", payload)
+        else:
+            payload_path = os.path.join(PROJECT_ROOT, "Core", "Exploits", subrepl, "payloads", payload)
+        
+        if os.path.exists(payload_path):
+            hash_val = compute_sha256(payload_path)
+            name_without_ext = os.path.splitext(payload)[0].upper()
+            hashes_output.append(f"PAYLOAD_{subrepl}_{name_without_ext}:{hash_val}")
+            print(f"  PAYLOAD_{subrepl}_{name_without_ext}: {hash_val}")
+    
+    hashes_file = os.path.join(VERIFICATION_DIR, "hashes", "hashes.txt")
+    os.makedirs(os.path.dirname(hashes_file), exist_ok=True)
+    
+    with open(hashes_file, "w") as f:
+        f.write("\n".join(hashes_output) + "\n")
+    
+    print(f"\nHashes written to: {hashes_file}")
+    
+    print("\n--- Signing hashes ---")
+    sign_hashes()
+    print("\nAll done!")
 
 def sign_hashes():
     private_key_path = os.path.join(VERIFICATION_DIR, "private", "private_key.pem")
@@ -78,13 +196,15 @@ def sign_hashes():
 
 def main():
     parser = argparse.ArgumentParser(description="Hash Verification Management Tool")
-    parser.add_argument("command", choices=["generate-keys", "sign"], help="Command to run")
+    parser.add_argument("command", nargs="?", default="auto", choices=["generate-keys", "sign", "auto"], help="Command to run (default: auto)")
     args = parser.parse_args()
     
     if args.command == "generate-keys":
         generate_keys()
     elif args.command == "sign":
         sign_hashes()
+    elif args.command == "auto":
+        auto()
 
 if __name__ == "__main__":
     main()
