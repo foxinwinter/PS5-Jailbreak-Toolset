@@ -12,5 +12,7 @@ first_run.txt
 # Testing Stuff
 core/color.py
 
-
+# Editor Stuff
+*.kate-swp 
+.vscode
 
