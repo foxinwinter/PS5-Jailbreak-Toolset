@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# main
+# main.py
 # Copyright (c) 2026 foxinwinter
-# Licensed under GPLv3. See Extra/Licenses/LICENSE
+# Licensed under GPLv3. See docs/Licenses/LICENSE
 
 import argparse
 import sys
@@ -17,12 +17,14 @@ try:
     from cryptography.hazmat.primitives.asymmetric import padding
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.backends import default_backend
+
     HAS_CRYPTO = True
 except ImportError:
     HAS_CRYPTO = False
 
 try:
     import readline
+
     HAS_READLINE = True
 except ImportError:
     HAS_READLINE = False
@@ -31,7 +33,6 @@ VERSION = "Alpha"
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT_DIR)
-
 
 
 EXPLOITS = {}
@@ -43,12 +44,14 @@ HASHES_SIGNATURE_VALID = False
 def verify_hashes_signature():
     global HASHES_SIGNATURE_VALID
     if not HAS_CRYPTO:
-        print("[WARNING] cryptography library not installed - skipping signature verification")
+        print(
+            "[WARNING] cryptography library not installed - skipping signature verification"
+        )
         HASHES_SIGNATURE_VALID = True
         return True
 
-    verification_dir = os.path.join(ROOT_DIR, "Core", "Verification", "HashVerification")
-    public_key_path = os.path.join(verification_dir, "private", "public_key.pem")
+    verification_dir = os.path.join(ROOT_DIR, "core", "verification")
+    public_key_path = os.path.join(verification_dir, "keys", "public_key.pem")
     hashes_file = os.path.join(verification_dir, "hashes", "hashes.txt")
     signature_file = os.path.join(verification_dir, "hashes", "hashes.sig")
 
@@ -64,10 +67,11 @@ def verify_hashes_signature():
 
     try:
         from cryptography.hazmat.primitives import serialization
+
         with open(public_key_path, "rb") as f:
             public_key = serialization.load_pem_public_key(
                 f.read(),
-                backend=default_backend()
+                backend=default_backend(),  # type: ignore
             )
 
         with open(hashes_file, "rb") as f:
@@ -76,12 +80,7 @@ def verify_hashes_signature():
         with open(signature_file, "rb") as f:
             signature = f.read()
 
-        public_key.verify(
-            signature,
-            data,
-            padding.PKCS1v15(),
-            hashes.SHA256()
-        )
+        public_key.verify(signature, data, padding.PKCS1v15(), hashes.SHA256())  # type: ignore
         HASHES_SIGNATURE_VALID = True
         print("[OK] Hash signature verified")
         return True
@@ -94,7 +93,7 @@ def verify_hashes_signature():
 def load_trusted_hashes():
     if not verify_hashes_signature():
         return
-    hashes_file = os.path.join(ROOT_DIR, "Core", "Verification", "HashVerification", "hashes", "hashes.txt")
+    hashes_file = os.path.join(ROOT_DIR, "core", "verification", "hashes", "hashes.txt")
     if not os.path.exists(hashes_file):
         return
     with open(hashes_file, "r") as f:
@@ -115,34 +114,36 @@ load_trusted_hashes()
 
 
 def scan_exploits():
-    subrepls_dir = os.path.join(ROOT_DIR, "Core", "subREPLs")
-    info_dir = os.path.join(ROOT_DIR, "Core", "Exploits", "info")
+    exploits_dir = os.path.join(ROOT_DIR, "core", "exploits")
 
-    if not os.path.isdir(subrepls_dir):
+    if not os.path.isdir(exploits_dir):
         return
 
-    for filename in os.listdir(subrepls_dir):
-        file_path = os.path.join(subrepls_dir, filename)
-        if os.path.isfile(file_path) and not filename.startswith("_"):
-            name = os.path.splitext(filename)[0].upper()
-            EXPLOITS[name] = file_path
-            info = load_exploit_info(info_dir, name.lower())
-            info["FilePath"] = file_path
+    for exploit_name in os.listdir(exploits_dir):
+        exploit_path = os.path.join(exploits_dir, exploit_name)
+        if not os.path.isdir(exploit_path):
+            continue
+        exploit_file = os.path.join(exploit_path, "exploit.py")
+        if os.path.isfile(exploit_file):
+            name = exploit_name.upper()
+            EXPLOITS[name] = exploit_file
+            info = load_exploit_info(exploit_path, name.lower())
+            info["FilePath"] = exploit_file
             EXPLOIT_INFO[name] = info
 
 
-def load_exploit_info(info_dir, exploit_name):
-    found_dir = None
-    if os.path.isdir(info_dir):
-        for d in os.listdir(info_dir):
-            if d.lower() == exploit_name.lower():
-                found_dir = d
-                break
-    info_subdir = os.path.join(info_dir, found_dir) if found_dir else os.path.join(info_dir, exploit_name)
-    actual_name = found_dir if found_dir else exploit_name
-    info_file = os.path.join(info_subdir, f"{actual_name}.txt")
+def load_exploit_info(exploit_dir, exploit_name):
+    info_subdir = os.path.join(exploit_dir, "info")
+    info_file = os.path.join(info_subdir, f"{exploit_name}.txt")
     intro_file = os.path.join(info_subdir, "intro.txt")
-    info = {"About": "N/A", "Author": "N/A", "License": "N/A", "Intro": None, "SHA256": None, "FilePath": None}
+    info = {
+        "About": "N/A",
+        "Author": "N/A",
+        "License": "N/A",
+        "Intro": None,
+        "SHA256": None,
+        "FilePath": None,
+    }
 
     if os.path.exists(info_file):
         try:
@@ -236,10 +237,6 @@ def cmd_info(args):
     print()
 
 
-def clear_console():
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-
 def cmd_run(args):
     name = args.exploit.upper()
     if name not in EXPLOITS:
@@ -253,7 +250,6 @@ def cmd_run(args):
         print(f"Error: Cannot run exploit - {message}")
         sys.exit(1)
 
-    clear_console()
     repl_script = EXPLOITS[name]
     try:
         subprocess.run([sys.executable, repl_script])
@@ -278,10 +274,10 @@ def cmd_doctor(args):
         print("[OK] Python version")
 
     required_dirs = [
-        ("Core/Exploits", os.path.join(ROOT_DIR, "Core", "Exploits")),
-        ("Core/Exploits/info", os.path.join(ROOT_DIR, "Core", "Exploits", "info")),
-        ("payloads", os.path.join(ROOT_DIR, "payloads")),
-        ("Tools", os.path.join(ROOT_DIR, "Tools")),
+        ("core/exploits", os.path.join(ROOT_DIR, "core", "exploits")),
+        ("core/payloads", os.path.join(ROOT_DIR, "core", "payloads")),
+        ("core/tools", os.path.join(ROOT_DIR, "core", "tools")),
+        ("core/verification", os.path.join(ROOT_DIR, "core", "verification")),
     ]
 
     for name, path in required_dirs:
@@ -291,9 +287,11 @@ def cmd_doctor(args):
             errors.append(f"Missing directory: {name}")
 
     payload_paths = [
-        os.path.join(ROOT_DIR, "payloads", "JS", "Y2JB", "setlogserver.js"),
-        os.path.join(ROOT_DIR, "payloads", "JS", "Main", "PS5_Heuristic.js"),
-        os.path.join(ROOT_DIR, "payloads", "JS", "Y2JB", "lapse.js"),
+        os.path.join(
+            ROOT_DIR, "core", "exploits", "y2jb", "payloads", "setlogserver.js"
+        ),
+        os.path.join(ROOT_DIR, "core", "payloads", "js", "PS5_Heuristic.js"),
+        os.path.join(ROOT_DIR, "core", "exploits", "y2jb", "payloads", "lapse.js"),
     ]
 
     for path in payload_paths:
@@ -303,44 +301,37 @@ def cmd_doctor(args):
         else:
             warnings.append(f"Missing payload: {rel_path}")
 
-    info_dir = os.path.join(ROOT_DIR, "Core", "Exploits", "info")
-    if os.path.isdir(info_dir):
-        info_files = [f for f in os.listdir(info_dir) if f.endswith(".txt")]
-        print(f"[OK] Info directory ({len(info_files)} info files)")
-    else:
-        errors.append("Missing info directory")
+    exploits_dir = os.path.join(ROOT_DIR, "core", "exploits")
+    info_count = 0
+    for exploit_name in os.listdir(exploits_dir):
+        info_dir = os.path.join(exploits_dir, exploit_name, "info")
+        if os.path.isdir(info_dir):
+            info_files = [f for f in os.listdir(info_dir) if f.endswith(".txt")]
+            info_count += len(info_files)
+    print(f"[OK] Info files ({info_count} found)")
 
     print("\n--- SHA256 Hash Verification ---")
     if not HASHES_SIGNATURE_VALID:
         print("[SKIPPED] Hash signature invalid - cannot verify hashes")
     else:
-        exploits_dir = os.path.join(ROOT_DIR, "Core", "Exploits")
         for exploit_name, trusted_hashes in TRUSTED_HASHES.items():
-            found = False
-            for root, _, files in os.walk(exploits_dir):
-                for filename in files:
-                    if filename == f"{exploit_name}.py":
-                        exploit_file = os.path.join(root, filename)
-                        found = True
-                        actual_hash = compute_sha256(exploit_file)
-                        if actual_hash in trusted_hashes:
-                            print(f"[OK] {exploit_name}: SHA256 verified ({actual_hash[:16]}...)")
-                        else:
-                            errors.append(f"{exploit_name}: SHA256 mismatch! Expected one of {trusted_hashes}, got {actual_hash}")
-                        break
-                if found:
-                    break
-        if not found:
-            errors.append(f"{exploit_name}: File not found in {exploits_dir}")
-
-    for root, dirs, files in os.walk(exploits_dir):
-        for exploit_name in dirs:
-            info_subdir = os.path.join(root, exploit_name)
-            if os.path.isdir(info_subdir):
-                continue
-            name = exploit_name[:-3].upper()
-            if HASHES_SIGNATURE_VALID and name not in TRUSTED_HASHES:
-                warnings.append(f"{name}: No SHA256 hash configured - cannot verify integrity")
+            exploit_file = os.path.join(
+                exploits_dir, exploit_name.lower(), "exploit.py"
+            )
+            if os.path.exists(exploit_file):
+                actual_hash = compute_sha256(exploit_file)
+                if actual_hash and actual_hash in trusted_hashes:
+                    print(
+                        f"[OK] {exploit_name}: SHA256 verified ({actual_hash[:16]}...)"
+                    )
+                elif actual_hash:
+                    errors.append(
+                        f"{exploit_name}: SHA256 mismatch! Expected one of {trusted_hashes}, got {actual_hash}"
+                    )
+                else:
+                    errors.append(f"{exploit_name}: Failed to compute hash")
+            else:
+                errors.append(f"{exploit_name}: File not found in {exploits_dir}")
 
     print()
     if errors:
@@ -364,7 +355,7 @@ def setup_completion():
     EXPLOIT_NAMES = list(EXPLOITS.keys())
 
     def completer(text, state):
-        line = readline.get_line_buffer()
+        line = readline.get_line_buffer()  # type: ignore
         parts = line.split()
 
         if not parts:
@@ -372,7 +363,9 @@ def setup_completion():
         elif len(parts) == 1:
             matches = [c + " " for c in COMMANDS if c.startswith(parts[0])]
         elif parts[0] in ("info", "run") and len(parts) == 2:
-            matches = [e for e in EXPLOIT_NAMES if e.lower().startswith(parts[1].lower())]
+            matches = [
+                e for e in EXPLOIT_NAMES if e.lower().startswith(parts[1].lower())
+            ]
         else:
             matches = []
 
@@ -380,8 +373,8 @@ def setup_completion():
             return matches[state]
         return None
 
-    readline.parse_and_bind("tab: complete")
-    readline.set_completer(completer)
+    readline.parse_and_bind("tab: complete")  # type: ignore
+    readline.set_completer(completer)  # type: ignore
 
 
 def repl():
@@ -395,10 +388,15 @@ def repl():
         if file_path and HASHES_SIGNATURE_VALID:
             actual_hash = compute_sha256(file_path)
             trusted = TRUSTED_HASHES.get(name, [])
-            if trusted and actual_hash not in trusted:
-                print(f"[SECURITY] Skipping {name}: SHA256 not trusted ({actual_hash[:16]}...)\n")
-            elif actual_hash:
-                print(f"[SECURITY] Verified {name}: SHA256 ({actual_hash[:16]}...)\n")
+            if actual_hash:
+                if trusted and actual_hash not in trusted:
+                    print(
+                        f"[SECURITY] Skipping {name}: SHA256 not trusted ({actual_hash[:16]}...)\n"
+                    )
+                else:
+                    print(
+                        f"[SECURITY] Verified {name}: SHA256 ({actual_hash[:16]}...)\n"
+                    )
 
     while True:
         try:

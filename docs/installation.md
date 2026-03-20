@@ -118,7 +118,7 @@ You will see a message telling you that the internet connection was unsuccessful
 ## Notes
 To run code use 
 ```
-Tools/Y2JB/payload_sender.py
+core/tools/y2jb/payload_sender.py
 ```
 **ALL** Code must be .js format!
 
