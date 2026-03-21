@@ -1,4 +1,4 @@
-## PS5 Jailbreaking Toolbox
+## Exploit Management & Binary Execution Runtime
 This repo includes:
 Install Instructions for Jailbreaking tools
 Payloads (.js, .bin, and .elf)
