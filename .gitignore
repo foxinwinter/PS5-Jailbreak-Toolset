@@ -1,0 +1,27 @@
+# Logs
+logs/active/*
+logs/sessions/*
+logs/errors/*
+
+# Runtime
+runtime/temp/*
+runtime/cache/*
+
+# Config
+config/*.json
+
+# Junk
+*.log
+*.tmp
+
+# Python Stuff
+__pycache__
+.ruff-cache
+
+# Editor Stuff
+*.kate-swp
+.vscode
+
+# Local
+about.txt
+appearance.txt
