@@ -1,0 +1,35 @@
+{
+  "name": "E.M.B.E.R",
+  "fullname": "Exploit Management, Backup, and Execution Router",
+  "version": "2.0.0",
+  "description": "Advanced framework for console exploitation and payload management",
+  "author": "E.M.B.E.R Team",
+  "license": "MIT",
+  "architecture": {
+    "command": "parser -> router -> executor",
+    "managers": ["session", "payload", "exploit", "log", "device"],
+    "exploits": ["Luac0re", "Y2JB"],
+    "devices": ["PS5", "PS4"]
+  },
+  "directories": {
+    "core": {
+      "command": "Command parsing, routing, and execution",
+      "managers": "Centralized management systems",
+      "runtime": "Execution engine",
+      "utils": "Utility functions"
+    },
+    "exploits": "Exploit modules and shared framework",
+    "payloads": "Payload binaries and metadata",
+    "devices": "Device connectors and protocols",
+    "logs": "Log storage and management",
+    "runtime": "Temporary runtime files",
+    "config": "Configuration files",
+    "scripts": "Startup and build scripts",
+    "tests": "Test suite"
+  },
+  "dependencies": {
+    "python": ">=3.8",
+    "required": ["colorama", "prompt_toolkit"],
+    "optional": ["scapy", "pyyaml"]
+  }
+}

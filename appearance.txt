@@ -1,0 +1,46 @@
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐┌──────────────────────────────────────────────────┐┌─────────────────────────────────────────┐
+│ /Logs                                                                                           ││ /Status                                          ││ /Sync                                   │
+│ [Session ID]: output                                                                            ││ State: Connected or Not Connected                ││ Payloads: Payload Satus (more info in 2)│
+│ [Session ID]: output                                                                            ││ Log Server: State (PID #)                        ││ Latest Release: check if latest release │
+│ [Session ID]: output                                                                            ││ Last Sent Payload:                               │└─────────────────────────────────────────┘
+│ [Session ID]: output                                                                            ││ Last Action: (last ran command)                  │┌─────────────────────────────────────────┐
+│ [Session ID]: output                                                                            ││                                                  ││ /Payload Explorer                       │
+│ [Session ID]: output                                                                            ││ /Quick-Actions                                   ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ --- Logging ---                                  ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ [Pause Logs]                                     ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ [Clear Logs]                                     ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ --- Session Mangement ---                        ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ [Kill Session                                    ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                        /:Log Output                        ││ [Reconnect]                                      ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ [Refetch Target Info]                            ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ [Enable Debug Mode]                              ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ --- Payload Mangement ---                        ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ [Resend Last Payload]                            ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ [Refresh Payload List]                           ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ [Enable Unsafe Mode]                             ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            │└──────────────────────────────────────────────────┘│ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            │┌──────────────────────────────────────────────────┐│ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ /About                                           ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ --- Host ---                                     ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ OS: Detected OS                                  ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ Logging Port: Port #                             ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ --- Target --                                    ││ exploit-name.extension [send] [edit]    │
+│ [Session ID]: output                                                                            ││ Target IP: target-ip                             ││ exploit-name.extension [send] [edit]    │
+└─────────────────────────────────────────────────────────────────────────────────────────────────┘│ Target Port: target-port                         ││ exploit-name.extension [send] [edit]    │
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐│ Author: author of exploit                        ││ exploit-name.extension [send] [edit]    │
+│  /Command Prompt                                                                                ││ Exploit Class: class (Webkit, Kernel, Etc.)      ││ exploit-name.extension [send] [edit]    │
+│  >list exploits                                                                                 ││ Current Selected Exploit                         ││ exploit-name.extension [send] [edit]    │
+│   Exploit: Exploit1                                                                             ││ --- Session ---                                  ││ exploit-name.extension [send] [edit]    │
+│   Exploit: Exploit2                            /: Command Prompt                                ││ Session ID: randomly generated 3 letter string   ││ exploit-name.extension [send] [edit]    │
+│  FILLER                                                                                         ││ Session Uptime: uptime                           ││ exploit-name.extension [send] [edit]    │
+│  FILLER                                                                                         ││ Connection Time: connection-time                 ││ exploit-name.extension [send] [edit]    │
+│  >select exploit Exploit1                                                                       ││ --- E.M.B.E.R ---                                ││ exploit-name.extension [send] [edit]    │
+│  >start logserver Exploit1                                                                      ││ Version: ver #                                   ││ exploit-name.extension [send] [edit]    │
+│  >send payload /path/to/payload.lua                                                             ││ Build: (build type)                              ││ exploit-name.extension [send] [edit]    │
+│  >select exploit Exploit2;                                                                      ││ --- Info ---                                     ││ exploit-name.extension [send] [edit]    │
+│  >start logserver Exploit2                                                                      ││ Developer: foxinwinter                           ││ exploit-name.extension [send] [edit]    │
+│  >send payload /path/to/payload.js                                                              ││ Repo: https://github.com/EmberSystems/E.M.B.E.R  ││ exploit-name.extension [send] [edit]    │
+│  >shutdown                                                                                      ││ Support: Discord Server Link, or Website         ││ exploit-name.extension [send] [edit]    │
+└─────────────────────────────────────────────────────────────────────────────────────────────────┘└──────────────────────────────────────────────────┘└─────────────────────────────────────────┘
+
+This is the wanted appearance, for functionality see the ## Appearance header in about.txt

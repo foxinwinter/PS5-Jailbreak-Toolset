@@ -1,0 +1,252 @@
+ Notes (for my dumbass):
+    1: Completely replace EVERYTHING so far (make a backup (in ../) and rm -rf all the files / folders in the Working Folder (/nyaa/Github/EmberSystems/E.M.B.E.R), other than about.txt and apperance.txt
+    2: Each Section, has what it should be, preceded by /
+    3: Keep the /Label tags
+    4: Resize boxes to fit however big the terminal is (but set a minimum size)
+
+File / Folder Layout:
+
+E.M.B.E.R/
+├── core/                     # main logic (brain)
+│   ├── command/
+│   │   ├── parser.py
+│   │   ├── router.py
+│   │   └── commands/
+│   │       ├── session.py
+│   │       ├── payload.py
+│   │       ├── logging.py
+│   │       └── system.py
+│   │
+│   ├── managers/
+│   │   ├── session_manager.py
+│   │   ├── payload_manager.py
+│   │   ├── exploit_manager.py
+│   │   ├── log_manager.py
+│   │   └── device_manager.py
+│   │
+│   ├── runtime/
+│   │   └── executor.py
+│   │
+│   └── utils/
+│       ├── file_utils.py
+│       ├── net_utils.py
+│       └── format_utils.py
+│
+├── exploits/                 # exploit modules (NOT subREPLs)
+│   ├── Luac0re/
+│   │   ├── exploit.json
+│   │   ├── handler.py
+│   │   ├── logserver.py
+│   │   ├── adapter.py
+│   │   └── payloads/
+│   │
+│   ├── Y2JB/
+│   │   ├── exploit.json
+│   │   ├── handler.py
+│   │   ├── logserver.py
+│   │   ├── adapter.py
+│   │   └── payloads/
+│   │
+│   └── shared/
+│       ├── base_exploit.py
+│       └── interfaces.py
+│
+├── payloads/                 # global payload library
+│   ├── luac0re/
+│   │   ├── dump_memory.lua
+│   │   ├── shell_exec.lua
+│   │   └── test.lua
+│   │
+│   ├── y2jb/
+│   │   ├── exploit.js
+│   │   └── loader.js
+│   │
+│   ├── bin/
+│   │   ├── raw/
+│   │   └── elf/
+│   │
+│   └── metadata/
+│       ├── payload_index.json
+│       └── manifest.json
+│
+├── devices/                  # target handling (PS5, etc.)
+│   ├── ps5/
+│   │   ├── connector.py
+│   │   ├── protocol.py
+│   │   ├── info.py
+│   │   └── scanner.py
+│   │
+│   └── base/
+│       ├── device.py
+│       └── interface.py
+│
+├── logs/                     # logging system
+│   ├── active/
+│   │   ├── latest.log
+│   │   └── logserver.pid
+│   │
+│   ├── sessions/
+│   │   ├── session_001.log
+│   │   └── session_002.log
+│   │
+│   └── errors/
+│       └── crash.log
+│
+├── runtime/                  # temp execution stuff
+│   ├── temp/
+│   └── cache/
+│
+│
+│
+├── config/                   # configs
+│   └── exploit-name.json
+│
+│
+├── scripts/                  # helper scripts
+│   ├── start.sh
+│   ├── build.sh
+│   └── dev.sh
+│
+├── tests/                    # testing (optional but smart)
+│   ├── payload_tests.py
+│   └── exploit_tests.py
+│
+└── main.py
+
+File Usage:
+core/
+    command/
+        parser.py > Takes Raw Input, and splits it into: { "command": "command-name", "args": ["", "test.lua"] }
+        router.py > Recives parsed command (from parser.py) and decides what handler to call, ex:
+                                                                                            send → payload.py
+                                                                                            start logserver → logging.py
+        commands/
+                session.py > Handles: Kill Session, Reconnect
+                             talks to session_manager
+                payload.py > Handles: send payload, and resend last payload. Talks to payload_manager
+                logging.py > Handles: start logserver, stop logserver, clear logs. Talks to log_manager
+                system.py > Handles: refetch target info, debug mode. Talks to many managers < Handles global control commands that manage system-wide state, diagnostics, and environment                              operations across multiple components.
+    managers/
+        session_manager.py < Tracks current Session ID, Selected Payload, active device, last sent payload, and selected exploit
+        payload_manager.py < Loads payload files, Makes sure they are compatable with the Selected Exploit, and sends the payload via device_manager
+                             ^^^^^^^^^^^^^^^^^^^             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                             payloads/Selected Exploit       Via a manifest file in payloads/metadata/manifest.json
+        exploit_manager.py < Loads exploits from exploits/exploit-name and keeps track of exploit metadata
+        log_manager.py < Writes logs to logs/active/latest.log, handles logserver.pid File
+        device_manager.py < Connects to PS5, Sends Data, Recives Responses, Feeds about Panel
+    runtime/
+        executor.py < Actually runs things, Payload Send, Exploit Execution
+        temp/ < Any temp files
+        cache/ < Any cached files
+exploits
+    exploit-name/
+        exploit.json < Holds:
+            {
+            "name": "exploit-name",
+            "type": "lua"
+            }
+        logserver.py < That specific exploits log server
+    shared/
+        base_exploit.py < Base class for all exploits, defines requires functions
+payloads/
+    exploit-name/
+        *.exploits expected file type, defined by type in exploit.json
+    bin/
+        raw/ < Raw Shellcode / hex
+        elf/ < ELF Binaries
+    metadata/
+        payload_index.json < Index of all Payloads
+        tags.json < Used to fill Exploit Class in the UI
+devices/
+    ps5/
+        connector.py < Opens connection
+        protocol.py < Defines how data is sent/received
+    base/
+        device.py < Base Device Class
+        interface.py < Defines requiered devices functions
+logs/
+    active/
+        latest.log < Live log file (UI reads this)
+        logserver.pid < PID of the running logfile (kill method between windows and linux differs)
+    sessions/
+        session-id.log
+    errors/
+        crash.log
+config/
+    exploit-name.json < Contains the last ip that a payload was used to, reads from this by default for this exploit, however, on next launch, replace this with default values and ask for the IP/ port again
+main.py < Main Executable
+.gitignore < Explained in further
+
+Terms:
+     Broad:
+        Session ID (a randomly generated 6 letter string, ex. a2md2a), but be sure one that was used doesnt get used again
+     exploit.json
+        exploit-name, the string to be used to identify different exploits
+        type, the type of files to expect to be sent (can send others if allow-unsafe-payloads is run)
+
+
+Further:
+    payloads/metadata/manifest.json should be layed out and read like this:
+        {
+        "payload-name.extension": {
+            "exploit": "exploit-name",
+            "type": "extension",
+            "tags": ["filler", "filler"],
+            "repo": ["https://website.com/user-or-organization/repo.git"]
+        },
+        "payload-name.extension": {
+            "exploit": "exploit-name",
+            "type": "extension",
+            "tags": ["filler"],
+            "repo": ["https://website.com/user-or-organization/repo.git"]
+        }
+       }
+
+    .gitignore:
+
+        # Logs
+        logs/active/*
+        logs/sessions/*
+        logs/errors/*
+
+        # Runtime
+        runtime/temp/*
+        runtime/cache/*
+
+        # Config
+        config/*.json
+
+        # Junk
+        *.log
+        *.tmp
+
+        # Python Stuff
+        __pycache__
+        .ruff-cache
+
+        # Editor Stuff
+        *.kate-swp
+        .vscode
+
+        # Local
+        about.txt
+        apperance.txt
+
+Extra: Quick Action buttons should be clickable
+
+
+
+## Appearance
+All Sections have what they are, preceded by a /
+/Log Output
+    replace [Session ID] with the current Session ID
+/About
+    Replace all the info with the correct stuff
+/Sync
+    Check for updates from the repo of the exploit (defined in exploits/manifest.json)
+    Repo for luac0re is: 'https://github.com/Gezine/luac0re.git'
+    Repo for Y2JB is: 'https://github.com/Gezine/Y2JB.git'
+/Payload Explorer
+    Lists all payloads that the current exploit supports
+
+

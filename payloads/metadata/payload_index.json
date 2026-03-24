@@ -1,0 +1,54 @@
+{
+  "payloads": [
+    {
+      "id": "kernel_basic",
+      "name": "Basic Kernel Payload",
+      "description": "Basic kernel read/write access",
+      "exploit": "Luac0re",
+      "file": "luac0re/kernel_basic.bin",
+      "size": 4096,
+      "author": "E.M.B.E.R Team",
+      "version": "1.0.0"
+    },
+    {
+      "id": "kernel_privileged",
+      "name": "Privileged Kernel Payload",
+      "description": "Full kernel privileges",
+      "exploit": "Luac0re",
+      "file": "luac0re/kernel_privileged.bin",
+      "size": 8192,
+      "author": "E.M.B.E.R Team",
+      "version": "1.0.0"
+    },
+    {
+      "id": "jailbreak_900",
+      "name": "Jailbreak 9.00",
+      "description": "PS4 jailbreak for firmware 9.00",
+      "exploit": "Y2JB",
+      "file": "y2jb/jailbreak_900.bin",
+      "size": 8192,
+      "author": "E.M.B.E.R Team",
+      "version": "1.0.0"
+    },
+    {
+      "id": "jailbreak_950",
+      "name": "Jailbreak 9.50",
+      "description": "PS4 jailbreak for firmware 9.50",
+      "exploit": "Y2JB",
+      "file": "y2jb/jailbreak_950.bin",
+      "size": 8192,
+      "author": "E.M.B.E.R Team",
+      "version": "1.0.0"
+    },
+    {
+      "id": "jailbreak_960",
+      "name": "Jailbreak 9.60",
+      "description": "PS4 jailbreak for firmware 9.60",
+      "exploit": "Y2JB",
+      "file": "y2jb/jailbreak_960.bin",
+      "size": 8192,
+      "author": "E.M.B.E.R Team",
+      "version": "1.0.0"
+    }
+  ]
+}

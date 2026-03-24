@@ -1,450 +1,369 @@
 #!/usr/bin/env python3
-# main.py
-# Copyright (c) 2026 foxinwinter
-# Licensed under GPLv3. See docs/Licenses/LICENSE
 
-import argparse
 import sys
 import os
-import importlib
-import inspect
-import platform
+import urwid
+import threading
+import time
+import socket
+import json
 import hashlib
-import re
-import subprocess
+import random
+import string
+import platform
+from datetime import datetime
+from typing import Optional, Dict, Any, List
 
-try:
-    from cryptography.hazmat.primitives.asymmetric import padding
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.backends import default_backend
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-    HAS_CRYPTO = True
-except ImportError:
-    HAS_CRYPTO = False
-
-try:
-    import readline
-
-    HAS_READLINE = True
-except ImportError:
-    HAS_READLINE = False
-
-VERSION = "Alpha"
-
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, ROOT_DIR)
+from core.command.parser import CommandParser
+from core.command.router import CommandRouter
+from core.managers.session_manager import SessionManager
+from core.managers.payload_manager import PayloadManager
+from core.managers.exploit_manager import ExploitManager
+from core.managers.log_manager import LogManager
+from core.managers.device_manager import DeviceManager
+from core.utils.format_utils import FormatUtils
 
 
-EXPLOITS = {}
-EXPLOIT_INFO = {}
-TRUSTED_HASHES = {}
-HASHES_SIGNATURE_VALID = False
+class EMBERUI:
+    VERSION = "2.0.0"
+    BUILD = "alpha"
 
+    def __init__(self):
+        self.session_manager = SessionManager()
+        self.payload_manager = PayloadManager()
+        self.exploit_manager = ExploitManager()
+        self.log_manager = LogManager()
+        self.device_manager = DeviceManager()
 
-def verify_hashes_signature():
-    global HASHES_SIGNATURE_VALID
-    if not HAS_CRYPTO:
-        print(
-            "[WARNING] cryptography library not installed - skipping signature verification"
+        self.parser = CommandParser()
+        self.router = CommandRouter(
+            self.session_manager,
+            self.payload_manager,
+            self.exploit_manager,
+            self.log_manager,
+            self.device_manager,
         )
-        HASHES_SIGNATURE_VALID = True
-        return True
 
-    verification_dir = os.path.join(ROOT_DIR, "core", "verification")
-    public_key_path = os.path.join(verification_dir, "keys", "public_key.pem")
-    hashes_file = os.path.join(verification_dir, "hashes", "hashes.txt")
-    signature_file = os.path.join(verification_dir, "hashes", "hashes.sig")
+        self.log_output: List[str] = []
+        self.target_ip = ""
+        self.target_port = 9000
+        self.logging_port = 9090
+        self.logserver_pid = None
+        self.current_exploit = None
+        self.last_payload = None
+        self.debug_mode = False
+        self.unsafe_mode = False
+        self.logs_paused = False
 
-    if not os.path.exists(public_key_path):
-        print("[WARNING] public_key.pem not found - skipping signature verification")
-        HASHES_SIGNATURE_VALID = True
-        return True
+        self._generate_session_id()
+        self._setup_ui()
 
-    if not os.path.exists(signature_file):
-        print("[WARNING] hashes.sig not found - skipping signature verification")
-        HASHES_SIGNATURE_VALID = True
-        return True
+    def _generate_session_id(self):
+        while True:
+            sid = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+            if sid not in self.session_manager.get_active_sessions():
+                self.session_id = sid
+                break
 
-    try:
-        from cryptography.hazmat.primitives import serialization
+    def _setup_ui(self):
+        self.palette = {
+            "header": "light cyan",
+            "log_output": "white",
+            "status": "light gray",
+            "sync": "light gray",
+            "about": "light gray",
+            "payload": "light gray",
+            "command": "light green",
+            "button": "light cyan",
+            "button_focus": "white",
+        }
 
-        with open(public_key_path, "rb") as f:
-            public_key = serialization.load_pem_public_key(
-                f.read(),
-                backend=default_backend(),  # type: ignore
-            )
+    def get_target_info(self) -> Dict[str, Any]:
+        return {
+            "ip": self.target_ip,
+            "port": self.target_port,
+            "connected": self.device_manager.is_connected(),
+            "firmware": self.device_manager.get_firmware()
+            if self.device_manager.is_connected()
+            else "Unknown",
+        }
 
-        with open(hashes_file, "rb") as f:
-            data = f.read()
+    def get_sync_info(self) -> Dict[str, Any]:
+        return {
+            "luac0re": {
+                "repo": "https://github.com/Gezine/luac0re.git",
+                "latest": "unknown",
+            },
+            "y2jb": {"repo": "https://github.com/Gezine/Y2JB.git", "latest": "unknown"},
+        }
 
-        with open(signature_file, "rb") as f:
-            signature = f.read()
+    def get_about_info(self) -> Dict[str, Any]:
+        return {
+            "os": platform.system() + " " + platform.release(),
+            "logging_port": self.logging_port,
+            "target_ip": self.target_ip or "Not set",
+            "target_port": self.target_port,
+            "author": "foxinwinter",
+            "repo": "https://github.com/EmberSystems/E.M.B.E.R",
+            "version": self.VERSION,
+            "build": self.BUILD,
+        }
 
-        public_key.verify(signature, data, padding.PKCS1v15(), hashes.SHA256())  # type: ignore
-        HASHES_SIGNATURE_VALID = True
-        print("[OK] Hash signature verified")
-        return True
-    except Exception as e:
-        print(f"[SECURITY] Hash signature verification FAILED: {e}")
-        print("[SECURITY] Refusing to load untrusted hashes!")
-        return False
+    def add_log(self, message: str):
+        if not self.logs_paused:
+            timestamp = FormatUtils.timestamp()
+            self.log_output.append(f"[{self.session_id}] {message}")
+            if len(self.log_output) > 100:
+                self.log_output.pop(0)
 
+    def get_payload_list(self) -> List[str]:
+        if not self.current_exploit:
+            return []
+        return self.payload_manager.get_payloads_for_exploit(self.current_exploit)
 
-def load_trusted_hashes():
-    if not verify_hashes_signature():
-        return
-    hashes_file = os.path.join(ROOT_DIR, "core", "verification", "hashes", "hashes.txt")
-    if not os.path.exists(hashes_file):
-        return
-    with open(hashes_file, "r") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if ":" in line:
-                name, hash_val = line.split(":", 1)
-                name = name.strip().upper()
-                hash_val = hash_val.strip()
-                if name not in TRUSTED_HASHES:
-                    TRUSTED_HASHES[name] = []
-                TRUSTED_HASHES[name].append(hash_val)
-
-
-load_trusted_hashes()
-
-
-def scan_exploits():
-    exploits_dir = os.path.join(ROOT_DIR, "core", "exploits")
-
-    if not os.path.isdir(exploits_dir):
-        return
-
-    for exploit_name in os.listdir(exploits_dir):
-        exploit_path = os.path.join(exploits_dir, exploit_name)
-        if not os.path.isdir(exploit_path):
-            continue
-        exploit_file = os.path.join(exploit_path, "exploit.py")
-        if os.path.isfile(exploit_file):
-            name = exploit_name.upper()
-            EXPLOITS[name] = exploit_file
-            info = load_exploit_info(exploit_path, name.lower())
-            info["FilePath"] = exploit_file
-            EXPLOIT_INFO[name] = info
+    def get_status_info(self) -> Dict[str, Any]:
+        return {
+            "state": "Connected"
+            if self.device_manager.is_connected()
+            else "Not Connected",
+            "log_server": f"Running ({self.logserver_pid})"
+            if self.logserver_pid
+            else "Stopped",
+            "last_sent_payload": self.last_payload or "None",
+            "last_action": self.session_manager.get_last_action() or "None",
+        }
 
 
-def load_exploit_info(exploit_dir, exploit_name):
-    info_subdir = os.path.join(exploit_dir, "info")
-    info_file = os.path.join(info_subdir, f"{exploit_name}.txt")
-    intro_file = os.path.join(info_subdir, "intro.txt")
-    info = {
-        "About": "N/A",
-        "Author": "N/A",
-        "License": "N/A",
-        "Intro": None,
-        "SHA256": None,
-        "FilePath": None,
-    }
+class LogOutputBox(urwid.ListBox):
+    def __init__(self, ui: EMBERUI):
+        self.ui = ui
+        self.content = []
+        super().__init__(self.content)
 
-    if os.path.exists(info_file):
+    def refresh(self):
+        self.content = []
+        for log in self.ui.log_output[-50:]:
+            self.content.append(urwid.Text(log))
+        super().__init__(self.content)
+
+
+class StatusBox(urwid.WidgetWrap):
+    def __init__(self, ui: EMBERUI):
+        self.ui = ui
+        self._w = self._build()
+
+    def _build(self):
+        status = self.ui.get_status_info()
+
+        content = [
+            urwid.Text(("header", " /Status")),
+            urwid.Divider(),
+            urwid.Text(f"State: {status['state']}"),
+            urwid.Text(f"Log Server: {status['log_server']}"),
+            urwid.Text(f"Last Sent Payload: {status['last_sent_payload']}"),
+            urwid.Text(f"Last Action: {status['last_action']}"),
+            urwid.Divider(),
+            urwid.Text(("header", " /Quick-Actions")),
+            urwid.Divider(),
+        ]
+
+        return urwid.ListBox(content)
+
+
+class SyncBox(urwid.WidgetWrap):
+    def __init__(self, ui: EMBERUI):
+        self.ui = ui
+        self._w = self._build()
+
+    def _build(self):
+        sync = self.ui.get_sync_info()
+
+        content = [
+            urwid.Text(("header", " /Sync")),
+            urwid.Divider(),
+            urwid.Text("Payloads: Loaded"),
+            urwid.Text(f"Luac0re: {sync['luac0re']['latest']}"),
+            urwid.Text(f"Y2JB: {sync['y2jb']['latest']}"),
+        ]
+
+        return urwid.ListBox(content)
+
+
+class AboutBox(urwid.WidgetWrap):
+    def __init__(self, ui: EMBERUI):
+        self.ui = ui
+        self._w = self._build()
+
+    def _build(self):
+        about = self.ui.get_about_info()
+
+        content = [
+            urwid.Text(("header", " /About")),
+            urwid.Divider(),
+            urwid.Text(("header", " --- Host ---")),
+            urwid.Text(f"OS: {about['os']}"),
+            urwid.Text(f"Logging Port: {about['logging_port']}"),
+            urwid.Divider(),
+            urwid.Text(("header", " --- Target ---")),
+            urwid.Text(f"Target IP: {about['target_ip']}"),
+            urwid.Text(f"Target Port: {about['target_port']}"),
+            urwid.Divider(),
+            urwid.Text(("header", " --- E.M.B.E.R ---")),
+            urwid.Text(f"Version: {about['version']}"),
+            urwid.Text(f"Build: {about['build']}"),
+            urwid.Divider(),
+            urwid.Text(("header", " --- Info ---")),
+            urwid.Text(f"Developer: {about['author']}"),
+            urwid.Text(f"Repo: {about['repo']}"),
+        ]
+
+        return urwid.ListBox(content)
+
+
+class PayloadExplorerBox(urwid.WidgetWrap):
+    def __init__(self, ui: EMBERUI):
+        self.ui = ui
+        self._w = self._build()
+
+    def _build(self):
+        payloads = self.ui.get_payload_list()
+
+        content = [
+            urwid.Text(("header", " /Payload Explorer")),
+            urwid.Divider(),
+        ]
+
+        for p in payloads:
+            content.append(urwid.Text(f"{p} [send] [edit]"))
+
+        return urwid.ListBox(content)
+
+
+class CommandPromptBox(urwid.WidgetWrap):
+    def __init__(self, ui: EMBERUI):
+        self.ui = ui
+        self._w = self._build()
+
+    def _build(self):
+        content = [
+            urwid.Text(("header", " /Command Prompt")),
+            urwid.Divider(),
+        ]
+        return urwid.ListBox(content)
+
+
+class EMBERApplication:
+    def __init__(self):
+        self.ui = EMBERUI()
+        self.loop = None
+        self.command_history = []
+        self.history_index = -1
+
+    def on_input(self, key):
+        if key == "enter":
+            self.execute_command(self.command_edit.get_edit_text())
+            self.command_edit.set_edit_text("")
+        elif key == "up":
+            if self.history_index < len(self.command_history) - 1:
+                self.history_index += 1
+                self.command_edit.set_edit_text(
+                    self.command_history[self.history_index]
+                )
+        elif key == "down":
+            if self.history_index > 0:
+                self.history_index -= 1
+                self.command_edit.set_edit_text(
+                    self.command_history[self.history_index]
+                )
+        elif key == "ctrl c":
+            raise urwid.ExitMainLoop()
+
+    def execute_command(self, cmd: str):
+        if not cmd.strip():
+            return
+
+        self.command_history.append(cmd)
+        self.history_index = len(self.command_history)
+
+        self.ui.add_log(f"> {cmd}")
+
         try:
-            with open(info_file, "r") as f:
-                content = f.read()
-                for line in content.strip().split("\n"):
-                    line = line.strip()
-                    if line.startswith("About:"):
-                        info["About"] = line.split(":", 1)[1].strip()
-                    elif line.startswith("Author:"):
-                        info["Author"] = line.split(":", 1)[1].strip()
-                    elif line.startswith("License:"):
-                        license_path = line.split(":", 1)[1].strip()
-                        license_path = license_path.replace("RepoRoot", ROOT_DIR)
-                        info["License"] = license_path
-        except Exception:
-            pass
+            parsed = self.ui.parser.parse(cmd)
+            result = self.ui.router.route(parsed)
+            if result:
+                self.ui.add_log(result)
+        except Exception as e:
+            self.ui.add_log(f"Error: {str(e)}")
 
-    if os.path.exists(intro_file):
-        try:
-            with open(intro_file, "r") as f:
-                info["Intro"] = f.read()
-        except Exception:
-            pass
+    def main(self):
+        canvas = urwid.raw_display.Screen()
 
-    return info
-
-
-def compute_sha256(file_path):
-    sha256_hash = hashlib.sha256()
-    try:
-        with open(file_path, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
-    except Exception:
-        return None
-
-
-def validate_exploit(name):
-    info = EXPLOIT_INFO.get(name)
-    if not info:
-        return False, "Exploit not found"
-
-    if not HASHES_SIGNATURE_VALID:
-        return True, "Hash signature invalid - skipping validation"
-
-    trusted = TRUSTED_HASHES.get(name, [])
-    if not trusted:
-        return True, "No trusted hashes configured - skipping validation"
-
-    file_path = info.get("FilePath")
-    if not file_path or not os.path.exists(file_path):
-        return False, "Exploit file not found"
-
-    actual_hash = compute_sha256(file_path)
-
-    if actual_hash not in trusted:
-        return False, f"SHA256 mismatch! Not in trusted hashes."
-
-    return True, "SHA256 validated"
-
-
-def cmd_list(args):
-    print("\nAvailable Exploits:")
-    print(f"{'Name':<20} {'Author':<20} {'About'}")
-    print("-" * 70)
-    for name, info in EXPLOIT_INFO.items():
-        about = info.get("About", "N/A")
-        if len(about) > 25:
-            about = about[:22] + "..."
-        author = info.get("Author", "N/A")
-        if len(author) > 18:
-            author = author[:15] + "..."
-        print(f"{name:<20} {author:<20} {about}")
-    print()
-
-
-def cmd_info(args):
-    name = args.exploit.upper()
-    if name not in EXPLOIT_INFO:
-        print(f"Error: Unknown exploit '{args.exploit}'")
-        print(f"Available exploits: {', '.join(EXPLOITS.keys())}")
-        sys.exit(1)
-
-    info = EXPLOIT_INFO[name]
-    print(f"\n=== {name} ===")
-    print(f"About:    {info.get('About', 'N/A')}")
-    print(f"Author:   {info.get('Author', 'N/A')}")
-    print(f"License:  {info.get('License', 'N/A')}")
-    print()
-
-
-def cmd_run(args):
-    name = args.exploit.upper()
-    if name not in EXPLOITS:
-        print(f"Error: Unknown exploit '{args.exploit}'")
-        print(f"Available exploits: {', '.join(EXPLOITS.keys())}")
-        sys.exit(1)
-
-    valid, message = validate_exploit(name)
-    print(f"[Security] {message}")
-    if not valid:
-        print(f"Error: Cannot run exploit - {message}")
-        sys.exit(1)
-
-    repl_script = EXPLOITS[name]
-    try:
-        subprocess.run([sys.executable, repl_script])
-    except KeyboardInterrupt:
-        print("\nInterrupted by user.")
-        return
-    except Exception as e:
-        print(f"\nError running exploit: {e}")
-        return
-
-
-def cmd_doctor(args):
-    print("\n=== PS5 Jailbreak Toolset Doctor ===\n")
-
-    errors = []
-    warnings = []
-
-    print(f"Python version: {platform.python_version()}")
-    if sys.version_info < (3, 8):
-        errors.append("Python 3.8+ required")
-    else:
-        print("[OK] Python version")
-
-    required_dirs = [
-        ("core/exploits", os.path.join(ROOT_DIR, "core", "exploits")),
-        ("core/payloads", os.path.join(ROOT_DIR, "core", "payloads")),
-        ("core/tools", os.path.join(ROOT_DIR, "core", "tools")),
-        ("core/verification", os.path.join(ROOT_DIR, "core", "verification")),
-    ]
-
-    for name, path in required_dirs:
-        if os.path.isdir(path):
-            print(f"[OK] {name}")
-        else:
-            errors.append(f"Missing directory: {name}")
-
-    payload_paths = [
-        os.path.join(
-            ROOT_DIR, "core", "exploits", "y2jb", "payloads", "setlogserver.js"
-        ),
-        os.path.join(ROOT_DIR, "core", "payloads", "js", "PS5_Heuristic.js"),
-        os.path.join(ROOT_DIR, "core", "exploits", "y2jb", "payloads", "lapse.js"),
-    ]
-
-    for path in payload_paths:
-        rel_path = os.path.relpath(path, ROOT_DIR)
-        if os.path.exists(path):
-            print(f"[OK] {rel_path}")
-        else:
-            warnings.append(f"Missing payload: {rel_path}")
-
-    exploits_dir = os.path.join(ROOT_DIR, "core", "exploits")
-    info_count = 0
-    for exploit_name in os.listdir(exploits_dir):
-        info_dir = os.path.join(exploits_dir, exploit_name, "info")
-        if os.path.isdir(info_dir):
-            info_files = [f for f in os.listdir(info_dir) if f.endswith(".txt")]
-            info_count += len(info_files)
-    print(f"[OK] Info files ({info_count} found)")
-
-    print("\n--- SHA256 Hash Verification ---")
-    if not HASHES_SIGNATURE_VALID:
-        print("[SKIPPED] Hash signature invalid - cannot verify hashes")
-    else:
-        for exploit_name, trusted_hashes in TRUSTED_HASHES.items():
-            exploit_file = os.path.join(
-                exploits_dir, exploit_name.lower(), "exploit.py"
-            )
-            if os.path.exists(exploit_file):
-                actual_hash = compute_sha256(exploit_file)
-                if actual_hash and actual_hash in trusted_hashes:
-                    print(
-                        f"[OK] {exploit_name}: SHA256 verified ({actual_hash[:16]}...)"
-                    )
-                elif actual_hash:
-                    errors.append(
-                        f"{exploit_name}: SHA256 mismatch! Expected one of {trusted_hashes}, got {actual_hash}"
-                    )
-                else:
-                    errors.append(f"{exploit_name}: Failed to compute hash")
-            else:
-                errors.append(f"{exploit_name}: File not found in {exploits_dir}")
-
-    print()
-    if errors:
-        print("ERRORS:")
-        for e in errors:
-            print(f"  [ERROR] {e}")
-    if warnings:
-        print("WARNINGS:")
-        for w in warnings:
-            print(f"  [WARN] {w}")
-    if not errors and not warnings:
-        print("All checks passed!")
-    print()
-
-
-def setup_completion():
-    if not HAS_READLINE:
-        return
-
-    COMMANDS = ["help", "list", "info", "run", "doctor", "exit", "quit"]
-    EXPLOIT_NAMES = list(EXPLOITS.keys())
-
-    def completer(text, state):
-        line = readline.get_line_buffer()  # type: ignore
-        parts = line.split()
-
-        if not parts:
-            matches = [c + " " for c in COMMANDS if c.startswith(text)]
-        elif len(parts) == 1:
-            matches = [c + " " for c in COMMANDS if c.startswith(parts[0])]
-        elif parts[0] in ("info", "run") and len(parts) == 2:
-            matches = [
-                e for e in EXPLOIT_NAMES if e.lower().startswith(parts[1].lower())
+        left_panel = urwid.ListBox(
+            [
+                urwid.Text(
+                    f"[{self.ui.session_id}] Welcome to E.M.B.E.R v{self.ui.VERSION}"
+                )
             ]
-        else:
-            matches = []
+        )
 
-        if state < len(matches):
-            return matches[state]
-        return None
+        status_sync_about = urwid.Pile(
+            [
+                urwid.LineBox(StatusBox(self.ui), tl="┌", tr="┐", bl="└", br="┘"),
+                urwid.LineBox(SyncBox(self.ui), tl="┌", tr="┐", bl="└", br="┘"),
+                urwid.LineBox(AboutBox(self.ui), tl="┌", tr="┐", bl="└", br="┘"),
+            ]
+        )
 
-    readline.parse_and_bind("tab: complete")  # type: ignore
-    readline.set_completer(completer)  # type: ignore
+        right_panel = urwid.Pile(
+            [
+                status_sync_about,
+                urwid.LineBox(
+                    PayloadExplorerBox(self.ui), tl="┌", tr="┐", bl="└", br="┘"
+                ),
+            ]
+        )
 
+        command_panel = urwid.LineBox(
+            CommandPromptBox(self.ui), tl="┌", tr="┐", bl="└", br="┘"
+        )
 
-def repl():
-    setup_completion()
+        self.command_edit = urwid.Edit("> ", edit_text="")
+        urwid.connect_signal(self.command_edit, "postchange", lambda *a: None)
 
-    print("=== PS5 Jailbreak Toolset ===")
-    print("Type 'help' for available commands, 'exit' to quit.\n")
+        main_layout = urwid.Pile(
+            [
+                urwid.Columns(
+                    [
+                        urwid.LineBox(left_panel, tl="┌", tr="┐", bl="└", br="┘"),
+                        right_panel,
+                    ]
+                ),
+                urwid.Columns(
+                    [
+                        command_panel,
+                        self.command_edit,
+                    ]
+                ),
+            ]
+        )
 
-    for name, info in EXPLOIT_INFO.items():
-        file_path = info.get("FilePath")
-        if file_path and HASHES_SIGNATURE_VALID:
-            actual_hash = compute_sha256(file_path)
-            trusted = TRUSTED_HASHES.get(name, [])
-            if actual_hash:
-                if trusted and actual_hash not in trusted:
-                    print(
-                        f"[SECURITY] Skipping {name}: SHA256 not trusted ({actual_hash[:16]}...)\n"
-                    )
-                else:
-                    print(
-                        f"[SECURITY] Verified {name}: SHA256 ({actual_hash[:16]}...)\n"
-                    )
-
-    while True:
-        try:
-            cmd = input("main> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nExiting...")
-            break
-
-        if not cmd:
-            continue
-
-        parts = cmd.split()
-        command = parts[0].lower()
-        args = parts[1:]
-
-        if command == "exit" or command == "quit":
-            print("Exiting...")
-            break
-        elif command == "help":
-            print("Available commands:")
-            print("  list              List available exploits")
-            print("  info <exploit>    Show exploit info")
-            print("  run <exploit>     Run an exploit")
-            print("  doctor            Run environment diagnostics")
-            print("  exit/quit         Exit the program")
-        elif command == "list":
-            cmd_list(argparse.Namespace())
-        elif command == "info":
-            if not args:
-                print("Usage: info <exploit>")
-                continue
-            cmd_info(argparse.Namespace(exploit=args[0]))
-        elif command == "run":
-            if not args:
-                print("Usage: run <exploit> [--config]")
-                continue
-            exploit_name = args[0]
-            config_override = "--config" in args
-            cmd_run(argparse.Namespace(exploit=exploit_name, config=config_override))
-        elif command == "doctor":
-            cmd_doctor(argparse.Namespace())
-        else:
-            print(f"Unknown command: {command}. Type 'help' for available commands.")
+        self.loop = urwid.MainLoop(
+            main_layout, palette=["header"], screen=canvas, input_filter=self.on_input
+        )
+        self.loop.run()
 
 
 def main():
-    scan_exploits()
-    repl()
+    try:
+        app = EMBERApplication()
+        app.main()
+    except KeyboardInterrupt:
+        print("\nExiting E.M.B.E.R...")
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
